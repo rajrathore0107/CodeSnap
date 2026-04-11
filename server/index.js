@@ -1,3 +1,4 @@
+const aiRoutes = require('./routes/ai');
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -22,6 +23,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/snippets', snippetRoutes);
+app.use('/api/ai', aiRoutes);
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {

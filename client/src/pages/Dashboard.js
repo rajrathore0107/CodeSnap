@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   getMySnippets, createSnippet,
-  deleteSnippet, updateSnippet
+  deleteSnippet, updateSnippet,
+  explainCode, improveCode, generateCode
 } from '../api';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
@@ -24,6 +25,12 @@ function Dashboard() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editId, setEditId] = useState(null);
   const [copied, setCopied] = useState('');
+  const [aiResult, setAiResult] = useState('');
+  const [aiLoading, setAiLoading] = useState('');
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const [showGenerate, setShowGenerate] = useState(false);
+  const [generateDesc, setGenerateDesc] = useState('');
+  const [generateLang, setGenerateLang] = useState('javascript');
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -55,7 +62,6 @@ function Dashboard() {
       ...form,
       tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
     };
-
     try {
       if (editId) {
         const res = await updateSnippet(editId, data);
@@ -102,6 +108,47 @@ function Dashboard() {
     setTimeout(() => setCopied(''), 2000);
   }
 
+  async function handleExplain(snippet) {
+    setAiLoading('explain-' + snippet.id);
+    setShowAiPanel(true);
+    setAiResult('');
+    try {
+      const res = await explainCode(snippet.code, snippet.language);
+      setAiResult(res.data.explanation);
+    } catch (err) {
+      setAiResult('Error getting explanation. Try again.');
+    }
+    setAiLoading('');
+  }
+
+  async function handleImprove(snippet) {
+    setAiLoading('improve-' + snippet.id);
+    setShowAiPanel(true);
+    setAiResult('');
+    try {
+      const res = await improveCode(snippet.code, snippet.language);
+      setAiResult(res.data.suggestions);
+    } catch (err) {
+      setAiResult('Error getting suggestions. Try again.');
+    }
+    setAiLoading('');
+  }
+
+  async function handleGenerate(e) {
+    e.preventDefault();
+    setAiLoading('generate');
+    try {
+      const res = await generateCode(generateDesc, generateLang);
+      setForm({ ...EMPTY_FORM, code: res.data.code, language: generateLang });
+      setShowGenerate(false);
+      setShowForm(true);
+      setGenerateDesc('');
+    } catch (err) {
+      console.error(err);
+    }
+    setAiLoading('');
+  }
+
   function handleLogout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -117,6 +164,12 @@ function Dashboard() {
         </div>
         <div style={styles.headerRight}>
           <Link to="/explore" style={styles.exploreBtn}>Explore</Link>
+          <button
+            onClick={() => setShowGenerate(true)}
+            style={{ ...styles.createBtn, background: '#6e40c9', marginRight: '4px' }}
+          >
+            AI Generate
+          </button>
           <button
             onClick={() => { setShowForm(true); setEditId(null); setForm(EMPTY_FORM); }}
             style={styles.createBtn}
@@ -256,6 +309,20 @@ function Dashboard() {
                       </button>
                     )}
                     <button
+                      onClick={() => handleExplain(snippet)}
+                      style={{ ...styles.actionBtn, color: '#58a6ff' }}
+                      disabled={aiLoading === 'explain-' + snippet.id}
+                    >
+                      {aiLoading === 'explain-' + snippet.id ? 'Thinking...' : 'Explain'}
+                    </button>
+                    <button
+                      onClick={() => handleImprove(snippet)}
+                      style={{ ...styles.actionBtn, color: '#3fb950' }}
+                      disabled={aiLoading === 'improve-' + snippet.id}
+                    >
+                      {aiLoading === 'improve-' + snippet.id ? 'Thinking...' : 'Improve'}
+                    </button>
+                    <button
                       onClick={() => handleEdit(snippet)}
                       style={styles.actionBtn}
                     >
@@ -294,6 +361,79 @@ function Dashboard() {
           </div>
         )}
       </div>
+
+      {showAiPanel && (
+        <div style={styles.aiPanel}>
+          <div style={styles.aiPanelHeader}>
+            <h3 style={styles.aiPanelTitle}>AI Analysis</h3>
+            <button
+              onClick={() => setShowAiPanel(false)}
+              style={styles.closeBtn}
+            >
+              ×
+            </button>
+          </div>
+          <div style={styles.aiContent}>
+            {aiLoading ? (
+              <div style={styles.aiLoading}>
+                <div style={styles.spinner}></div>
+                <p>Gemini is thinking...</p>
+              </div>
+            ) : (
+              <pre style={styles.aiText}>{aiResult}</pre>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showGenerate && (
+        <div style={styles.overlay} onClick={() => setShowGenerate(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <h2 style={styles.modalTitle}>Generate Code with AI</h2>
+            <form onSubmit={handleGenerate} style={styles.form}>
+              <div style={styles.group}>
+                <label style={styles.label}>Describe what you need</label>
+                <textarea
+                  placeholder="e.g. A function that fetches data from an API and handles errors gracefully"
+                  value={generateDesc}
+                  onChange={e => setGenerateDesc(e.target.value)}
+                  style={{ ...styles.textarea, minHeight: '120px' }}
+                  required
+                />
+              </div>
+              <div style={styles.group}>
+                <label style={styles.label}>Language</label>
+                <select
+                  value={generateLang}
+                  onChange={e => setGenerateLang(e.target.value)}
+                  style={styles.input}
+                >
+                  {LANGUAGES.map(l => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.modalBtns}>
+                <button
+                  type="button"
+                  onClick={() => setShowGenerate(false)}
+                  style={styles.cancelBtn}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{ ...styles.submitBtn, background: '#6e40c9' }}
+                  disabled={aiLoading === 'generate'}
+                >
+                  {aiLoading === 'generate' ? 'Generating...' : 'Generate Code'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -384,7 +524,7 @@ const styles = {
     fontSize: '11px',
     fontWeight: '600',
   },
-  cardActions: { display: 'flex', gap: '8px', flexShrink: 0 },
+  cardActions: { display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' },
   actionBtn: {
     background: 'transparent',
     color: '#8b949e',
@@ -495,6 +635,67 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
+  },
+  aiPanel: {
+    position: 'fixed',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: '420px',
+    background: '#161b22',
+    borderLeft: '1px solid #30363d',
+    zIndex: 50,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  aiPanelHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 24px',
+    borderBottom: '1px solid #30363d',
+  },
+  aiPanelTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#e6edf3',
+  },
+  closeBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#8b949e',
+    fontSize: '24px',
+    cursor: 'pointer',
+    lineHeight: 1,
+  },
+  aiContent: {
+    flex: 1,
+    padding: '24px',
+    overflowY: 'auto',
+  },
+  aiLoading: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '200px',
+    gap: '16px',
+    color: '#8b949e',
+  },
+  spinner: {
+    width: '32px',
+    height: '32px',
+    border: '3px solid #30363d',
+    borderTop: '3px solid #58a6ff',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  aiText: {
+    color: '#e6edf3',
+    fontSize: '14px',
+    lineHeight: '1.7',
+    whiteSpace: 'pre-wrap',
+    fontFamily: 'Inter, sans-serif',
   },
 };
 

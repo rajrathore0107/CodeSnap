@@ -35,3 +35,12 @@ export const updateSnippet = (id, data) =>
 
 export const deleteSnippet = (id) =>
   api.delete(`/snippets/${id}`);
+
+export const explainCode = (code, language) =>
+  api.post('/ai/explain', { code, language });
+
+export const improveCode = (code, language) =>
+  api.post('/ai/improve', { code, language });
+
+export const generateCode = (description, language) =>
+  api.post('/ai/generate', { description, language });
