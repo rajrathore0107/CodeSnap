@@ -12,41 +12,35 @@ const axios = require('axios');
 
 async function callGemini(prompt) {
   try {
-    const response = await axios.post(GEMINI_URL, {
-      contents: [{ parts: [{ text: prompt }] }]
+    console.log("🧠 Sending prompt to Gemini...");
+
+    const response = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }]
+      }),
     });
 
-    const data = response.data;
+    const data = await response.json();
 
-    console.log("Gemini response:", JSON.stringify(data, null, 2));
+    console.log("🔥 FULL GEMINI RESPONSE:", JSON.stringify(data, null, 2));
 
-    if (!data.candidates || !data.candidates[0]) {
-      throw new Error("Invalid Gemini response");
+    if (!response.ok) {
+      throw new Error(data.error?.message || 'Gemini API failed');
     }
 
-    return data.candidates[0].content.parts[0].text;
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error('No candidates returned from Gemini');
+    }
 
-  } catch (error) {
-    console.error("Gemini FULL error:", error.response?.data || error.message);
-    throw new Error("Gemini API failed");
+    return data.candidates[0]?.content?.parts?.[0]?.text || 'No text returned';
+
+  } catch (err) {
+    console.error("❌ Gemini ERROR:", err.message);
+    throw err;
   }
 }
-
-router.use(authMiddleware);
-
-router.post('/explain', async (req, res) => {
-  try {
-    const { code, language } = req.body;
-    if (!code) return res.status(400).json({ message: 'Code is required' });
-
-    const prompt = `Explain this ${language} code simply and clearly, step by step:\n\n${code}`;
-    const explanation = await callGemini(prompt);
-    res.json({ explanation });
-  } catch (error) {
-    console.error('Gemini error:', error.message);
-    res.status(500).json({ message: error.message });
-  }
-});
 
 router.post('/improve', async (req, res) => {
   try {
