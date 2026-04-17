@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://codesnap-api-jgca.onrender.com',
+  baseURL: 'https://codesnap-api-jgca.onrender.com/api',
 });
 
 api.interceptors.request.use((config) => {
