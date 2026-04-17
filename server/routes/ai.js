@@ -1,3 +1,4 @@
+const axios = require('axios');
 require('dotenv').config();
 const express = require('express');
 const authMiddleware = require('../middleware/auth');
@@ -8,17 +9,28 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 console.log("GEMINI_API_KEY:", process.env.GEMINI_API_KEY);
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
+const axios = require('axios');
+
 async function callGemini(prompt) {
-  const response = await fetch(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  try {
+    const response = await axios.post(GEMINI_URL, {
       contents: [{ parts: [{ text: prompt }] }]
-    }),
-  });
-  const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.candidates[0].content.parts[0].text;
+    });
+
+    const data = response.data;
+
+    console.log("Gemini response:", JSON.stringify(data, null, 2));
+
+    if (!data.candidates || !data.candidates[0]) {
+      throw new Error("Invalid Gemini response");
+    }
+
+    return data.candidates[0].content.parts[0].text;
+
+  } catch (error) {
+    console.error("Gemini FULL error:", error.response?.data || error.message);
+    throw new Error("Gemini API failed");
+  }
 }
 
 router.use(authMiddleware);
