@@ -8,7 +8,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 console.log("GEMINI_API_KEY:", process.env.GEMINI_API_KEY);
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-const axios = require('axios');
+const axios = require('axios'); // Note: You require axios here but are using native fetch below. You can safely remove this line if axios isn't used elsewhere in this file.
 
 async function callGemini(prompt) {
   try {
@@ -65,6 +65,22 @@ router.post('/generate', async (req, res) => {
     const text = await callGemini(prompt);
     const code = text.replace(/```[\w]*/g, '').replace(/```/g, '').trim();
     res.json({ code });
+  } catch (error) {
+    console.error('Gemini error:', error.message);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// NEW ROUTE: Added to handle the /explain endpoint requests from your frontend
+router.post('/explain', async (req, res) => {
+  try {
+    const { code, language } = req.body;
+    if (!code) return res.status(400).json({ message: 'Code is required' });
+
+    const prompt = `Explain what the following ${language} code does in simple terms:\n\n${code}`;
+    const explanation = await callGemini(prompt);
+    
+    res.json({ explanation }); 
   } catch (error) {
     console.error('Gemini error:', error.message);
     res.status(500).json({ message: error.message });
