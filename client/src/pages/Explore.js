@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getPublicSnippets } from '../api';
 import hljs from 'highlight.js';
@@ -19,11 +19,7 @@ function Explore() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || 'null');
 
-  useEffect(() => {
-    loadSnippets();
-  }, [language, page]);
-
-  async function loadSnippets(searchTerm = search) {
+  const loadSnippets = useCallback(async (searchTerm = search) => {
     setLoading(true);
     try {
       const params = { page };
@@ -37,7 +33,11 @@ function Explore() {
       console.error(err);
     }
     setLoading(false);
-  }
+  }, [search, page, language]);
+
+  useEffect(() => {
+    loadSnippets();
+  }, [loadSnippets]);
 
   function handleSearch(e) {
     e.preventDefault();
@@ -142,11 +142,7 @@ function SnippetCard({ snippet }) {
   const preview = snippet.code.slice(0, 200);
 
   useEffect(() => {
-    document.querySelectorAll('pre code').forEach(block => {
-      if (!block.dataset.highlighted) {
-        hljs.highlightElement(block);
-      }
-    });
+    hljs.highlightAll();
   }, []);
 
   return (
@@ -296,7 +292,6 @@ const styles = {
     marginBottom: '12px',
     border: '1px solid #21262d',
     maxHeight: '120px',
-    overflow: 'hidden',
   },
   pre: { margin: 0, padding: '12px', fontSize: '12px', overflowX: 'auto' },
   cardFooter: {
